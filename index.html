@@ -37,9 +37,12 @@
                 vec3 centerDir = normalize(targetPos - camPos);
                 float cosAngle = dot(origDir, centerDir);
 
-                // Ρυθμίσεις Ζώνης Πύκνωσης
-                float outerRadius = 0.978; 
-                float densityMask = smoothstep(outerRadius - 0.03, outerRadius, cosAngle); 
+                // --- ΡΥΘΜΙΣΕΙΣ ΖΩΝΗΣ ΠΥΚΝΩΣΗΣ ---
+                // ΑΛΛΑΓΗ ΕΔΩ: Αυξήσαμε το 0.978 σε 0.99 για να πλησιάσει στον ορίζοντα
+                float outerRadius = 0.99; 
+                
+                // ΑΛΛΑΓΗ ΕΔΩ: Μειώσαμε το εύρος μετάβασης (το 0.03 έγινε 0.015) για πιο "σφιχτό" δαχτυλίδι
+                float densityMask = smoothstep(outerRadius - 0.015, outerRadius, cosAngle); 
 
                 float powerExp = mix(300.0, 50.0, densityMask);
 
@@ -94,7 +97,6 @@
                     // C. ACCRETION DISK (ΛΕΠΤΟ ΔΑΧΤΥΛΙΔΙ)
                     float distXZ = length(p.xz);
                     
-                    // ΕΔΩ ΕΓΙΝΕ Η ΑΛΛΑΓΗ: Το 0.1 έγινε 0.01 για να είναι πολύ λεπτό
                     if (abs(p.y) < 0.01 && distXZ > Rs * 1.5 && distXZ < 14.0) {
                         
                         float rings = sin(distXZ * 10.0 + iTime * 2.0) * 0.5 + 0.5; 
@@ -115,7 +117,6 @@
                             brightness = 1.0 - abs(doppler) * 0.7; 
                         }
                         
-                        // Αυξήσαμε το decay (* 4.0) για να είναι πιο "κοφτό"
                         float intensity = 5.0 * exp(-(distXZ - Rs * 1.5) * 4.0);
                         
                         col += diskColor * intensity * brightness * rings * 0.8; 
@@ -210,11 +211,3 @@
     </script>
 </body>
 </html>
-
-
-
-
-
-
-
-
