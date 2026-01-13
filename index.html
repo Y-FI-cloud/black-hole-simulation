@@ -1,0 +1,136 @@
+// --- ΤΡΟΠΟΠΟΙΗΜΕΝΟ BACKGROUND (Με Ζώνη Πύκνωσης) ---
+vec3 getBackground(vec3 dir, vec3 origDir, vec3 camPos, vec3 targetPos) {
+    
+    // 1. Υπολογισμός Γωνίας
+    vec3 centerDir = normalize(targetPos - camPos);
+    float cosAngle = dot(origDir, centerDir);
+
+    // 2. Δημιουργία Μάσκας Πυκνότητας (Density Mask)
+    // --- ΡΥΘΜΙΣΕΙΣ ΖΩΝΗΣ ΠΥΚΝΩΣΗΣ ---
+    float outerRadius = 0.978; 
+    //float innerRadius = 1.0; 
+
+    float densityMask = smoothstep(outerRadius - 0.03, outerRadius, cosAngle); 
+                      //* (1.0 - smoothstep(innerRadius, innerRadius + 0.005, cosAngle));
+
+    // 3. Ρύθμιση Πυκνότητας Αστεριών
+    float powerExp = mix(300.0, 50.0, densityMask);
+
+    // Δημιουργία αστεριών
+    float stars = pow(fract(sin(dot(dir.xy, vec2(12.9898,78.233))) * 43758.5453), powerExp) * 10.0;
+    
+    // Χρώμα
+    vec3 starColor = vec3(stars) + vec3(0.2, 0.3, 0.5) * densityMask * stars * 0.5;
+
+    return starColor;
+}
+
+void mainImage( out vec4 fragColor, in vec2 fragCoord )
+{
+    vec2 uv = (fragCoord - 0.5 * iResolution.xy) / iResolution.y;
+
+    vec3 ro = vec3(0.0, 6.0, -50.0); 
+    vec3 ta = vec3(0.0, 0.0, 0.0);
+    vec3 cw = normalize(ta - ro);
+    vec3 cp = vec3(0.0, 1.0, 0.0);
+    vec3 cu = normalize(cross(cw, cp));
+    vec3 cv = normalize(cross(cu, cw));
+    vec3 rd = normalize(uv.x * cu + uv.y * cv + 1.8 * cw);
+    
+    vec3 origRd = rd; // Αποθήκευση αρχικής κατεύθυνσης
+
+    vec3 p = ro;           
+    vec3 col = vec3(0.0);  
+    
+    float bhMass = 1.2; 
+    float Rs = 2.0 * bhMass; 
+    
+    bool hitSomething = false;
+
+    // --- LOOP ---
+    for(int i = 0; i < 400; i++) { 
+        float dist = length(p); 
+        
+        // 1. EVENT HORIZON
+        if(dist < Rs) { 
+            col = vec3(0.0); 
+            hitSomething = true;
+            break; 
+        }
+
+        // 2. BACKGROUND CHECK
+        if(dist > 80.0) {
+            col += getBackground(rd, origRd, ro, ta); 
+            hitSomething = true;
+            break;
+        }
+
+        // 3. ACCRETION DISK
+        float distXZ = length(p.xz);
+        if (abs(p.y) < 0.15 && distXZ > Rs * 1.5 && distXZ < 14.0) {
+            float rings = sin(distXZ * 10.0 + iTime * 2.0) * 0.5 + 0.5; 
+            float doppler = -p.x / distXZ; 
+            
+            vec3 hotColor = vec3(0.8, 0.9, 1.0); 
+            vec3 coldColor = vec3(0.8, 0.1, 0.0); 
+            vec3 midColor = vec3(1.0, 0.6, 0.1);  
+            
+            vec3 diskColor;
+            float brightness;
+            if (doppler > 0.0) {
+                diskColor = mix(midColor, hotColor, doppler * 0.8);
+                brightness = 1.0 + doppler * 1.5; 
+            } else {
+                diskColor = mix(midColor, coldColor, abs(doppler) * 0.8);
+                brightness = 1.0 - abs(doppler) * 0.7; 
+            }
+            float intensity = 2.0 * exp(-(distXZ - Rs * 1.5) * 0.5);
+            col += diskColor * intensity * brightness * rings * 0.25; 
+        }
+
+        // --- 4. PHYSICS (Bending Light) ---
+
+        /* // --- ΑΡΧΗ ΣΧΟΛΙΩΝ: ΜΟΝΤΕΛΟ ΝΕΥΤΩΝΑ (Κλασικό) ---
+        // Η δύναμη μειώνεται απλά με το τετράγωνο της απόστασης.
+        // Δίνει πιο "ήπια" καμπύλωση.
+        
+        float force = bhMass / (dist * dist + 0.1); 
+        vec3 gravity = normalize(-p) * force;
+        rd += gravity * 0.5; 
+        
+        // --- ΤΕΛΟΣ ΣΧΟΛΙΩΝ ΝΕΥΤΩΝΑ --- 
+        */
+
+
+        // --- EINSTEIN (SCHWARZSCHILD APPROXIMATION) ---
+        // Εδώ προσομοιώνουμε την καμπύλωση του χωροχρόνου.
+        // Χρησιμοποιούμε "Γεωμετρική Απόσταση": dist * (dist - Rs)
+        // Καθώς πλησιάζουμε το Rs (Ορίζοντα), η τιμή τείνει στο 0 και η έλξη στο Άπειρο.
+        
+        float geoDist = dist * (dist - Rs);
+        geoDist = max(geoDist, 0.1); // Ασφάλεια για να μην κρασάρει (διαίρεση με 0)
+        
+        float force = bhMass / geoDist;
+        vec3 gravity = normalize(-p) * force;
+        
+        // Αυξάνουμε λίγο τον παράγοντα κάμψης (0.8) για να φανεί 
+        // η "Σφαίρα Φωτονίων" (Photon Sphere)
+        rd += gravity * 0.8; 
+        
+        rd = normalize(rd);
+        
+        // Προσαρμοζόμενο βήμα: Μικραίνει πολύ κοντά στην τρύπα για ακρίβεια
+        float stepSize = max(0.15 * dist / 5.0, 0.05);
+        p += rd * stepSize; 
+    }
+
+    if (!hitSomething) {
+        col += getBackground(rd, origRd, ro, ta);
+    }
+
+    col = clamp(col, 0.0, 5.0); 
+    col = col / (col + 1.0); 
+    col = pow(col, vec3(0.4545));
+    
+    fragColor = vec4(col, 1.0);
+}
