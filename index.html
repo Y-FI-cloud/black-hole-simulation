@@ -18,13 +18,13 @@
 
         if (!gl) { alert("WebGL not supported"); }
 
-        // --- 1. Vertex Shader ---
+        // --- 1. Vertex Shader (Η γεωμετρία της οθόνης) ---
         const vsSource = `
             attribute vec4 position;
             void main() { gl_Position = position; }
         `;
 
-        // --- 2. Fragment Shader ---
+        // --- 2. Fragment Shader (Ο Κώδικάς μας για τη Μαύρη Τρύπα) ---
         const fsSource = `
             precision mediump float;
             uniform vec3 iResolution;
@@ -32,32 +32,38 @@
 
             // --- USER CODE START ---
             
-            // --- BACKGROUND FUNCTION ---
+            // --- ΣΥΝΑΡΤΗΣΗ BACKGROUND (Με Αστέρια & Ζώνη Πύκνωσης) ---
             vec3 getBackground(vec3 dir, vec3 origDir, vec3 camPos, vec3 targetPos) {
+                
+                // Υπολογισμός Γωνίας
                 vec3 centerDir = normalize(targetPos - camPos);
                 float cosAngle = dot(origDir, centerDir);
 
-                // --- ΡΥΘΜΙΣΕΙΣ ΖΩΝΗΣ ΠΥΚΝΩΣΗΣ ---
-                // ΑΛΛΑΓΗ ΕΔΩ: Αυξήσαμε το 0.978 σε 0.99 για να πλησιάσει στον ορίζοντα
-                float outerRadius = 0.99; 
-                
-                // ΑΛΛΑΓΗ ΕΔΩ: Μειώσαμε το εύρος μετάβασης (το 0.03 έγινε 0.015) για πιο "σφιχτό" δαχτυλίδι
-                float densityMask = smoothstep(outerRadius - 0.015, outerRadius, cosAngle); 
+                // Ρυθμίσεις Ζώνης Πύκνωσης (Πόσο "σφιχτά" είναι τα αστέρια γύρω από την τρύπα)
+                float outerRadius = 0.978; 
+                // float innerRadius = 1.0; 
 
+                // Μάσκα για να ξέρουμε πού είμαστε
+                float densityMask = smoothstep(outerRadius - 0.03, outerRadius, cosAngle); 
+
+                // Ρύθμιση Πυκνότητας Αστεριών (300 = αραιά, 50 = πυκνά)
                 float powerExp = mix(300.0, 50.0, densityMask);
 
+                // Δημιουργία αστεριών
                 float stars = pow(fract(sin(dot(dir.xy, vec2(12.9898,78.233))) * 43758.5453), powerExp) * 10.0;
                 
+                // Χρώμα αστεριών (με λίγο μπλε στη ζώνη πύκνωσης)
                 vec3 starColor = vec3(stars) + vec3(0.2, 0.3, 0.5) * densityMask * stars * 0.5;
 
                 return starColor;
             }
 
-            // --- MAIN IMAGE FUNCTION ---
+            // --- ΚΥΡΙΑ ΣΥΝΑΡΤΗΣΗ ΕΙΚΟΝΑΣ ---
             void mainImage( out vec4 fragColor, in vec2 fragCoord )
             {
                 vec2 uv = (fragCoord - 0.5 * iResolution.xy) / iResolution.y;
 
+                // Κάμερα (Μακρινή λήψη)
                 vec3 ro = vec3(0.0, 6.0, -50.0); 
                 vec3 ta = vec3(0.0, 0.0, 0.0);
                 vec3 cw = normalize(ta - ro);
@@ -66,13 +72,13 @@
                 vec3 cv = normalize(cross(cu, cw));
                 vec3 rd = normalize(uv.x * cu + uv.y * cv + 1.8 * cw);
                 
-                vec3 origRd = rd; 
+                vec3 origRd = rd; // Κρατάμε την αρχική πορεία για το φόντο
 
                 vec3 p = ro;           
                 vec3 col = vec3(0.0);  
                 
-                float bhMass = 1.2; 
-                float Rs = 2.0 * bhMass; 
+                float bhMass = 1.2;       // Μάζα Μαύρης Τρύπας
+                float Rs = 2.0 * bhMass;  // Ακτίνα Schwarzschild
                 
                 bool hitSomething = false;
 
@@ -80,25 +86,23 @@
                 for(int i = 0; i < 400; i++) { 
                     float dist = length(p); 
                     
-                    // A. EVENT HORIZON
+                    // A. EVENT HORIZON (Μαύρη Τρύπα)
                     if(dist < Rs) { 
                         col = vec3(0.0); 
                         hitSomething = true;
                         break; 
                     }
 
-                    // B. BACKGROUND CHECK
+                    // B. BACKGROUND CHECK (Αν φύγαμε μακριά)
                     if(dist > 80.0) {
                         col += getBackground(rd, origRd, ro, ta); 
                         hitSomething = true;
                         break;
                     }
 
-                    // C. ACCRETION DISK (ΛΕΠΤΟ ΔΑΧΤΥΛΙΔΙ)
+                    // C. ACCRETION DISK (Δίσκος Προσαύξησης)
                     float distXZ = length(p.xz);
-                    
-                    if (abs(p.y) < 0.01 && distXZ > Rs * 1.5 && distXZ < 14.0) {
-                        
+                    if (abs(p.y) < 0.15 && distXZ > Rs * 1.5 && distXZ < 14.0) {
                         float rings = sin(distXZ * 10.0 + iTime * 2.0) * 0.5 + 0.5; 
                         float doppler = -p.x / distXZ; 
                         
@@ -109,6 +113,7 @@
                         vec3 diskColor;
                         float brightness;
                         
+                        // Doppler Effect (Μπλε προς τα εμάς, Κόκκινο όταν απομακρύνεται)
                         if (doppler > 0.0) {
                             diskColor = mix(midColor, hotColor, doppler * 0.8);
                             brightness = 1.0 + doppler * 1.5; 
@@ -117,21 +122,24 @@
                             brightness = 1.0 - abs(doppler) * 0.7; 
                         }
                         
-                        float intensity = 5.0 * exp(-(distXZ - Rs * 1.5) * 4.0);
-                        
-                        col += diskColor * intensity * brightness * rings * 0.8; 
+                        float intensity = 2.0 * exp(-(distXZ - Rs * 1.5) * 0.5);
+                        col += diskColor * intensity * brightness * rings * 0.25; 
                     }
 
-                    // --- D. PHYSICS ---
+                    // --- D. PHYSICS (Bending Light / Lensing) ---
+                    // Χρήση Schwarzschild μετρικής για καμπύλωση
+                    
                     float geoDist = dist * (dist - Rs);
-                    geoDist = max(geoDist, 0.1);
+                    geoDist = max(geoDist, 0.1); // Προστασία διαίρεσης
                     
                     float force = bhMass / geoDist;
                     vec3 gravity = normalize(-p) * force;
                     
+                    // Παράγοντας κάμψης
                     rd += gravity * 0.6; 
                     rd = normalize(rd);
                     
+                    // Προσαρμοζόμενο βήμα (Adaptive Step)
                     float stepSize = max(0.15 * dist / 5.0, 0.05);
                     p += rd * stepSize; 
                 }
@@ -140,12 +148,14 @@
                     col += getBackground(rd, origRd, ro, ta);
                 }
 
+                // Tone mapping & Gamma Correction
                 col = clamp(col, 0.0, 5.0); 
                 col = col / (col + 1.0); 
                 col = pow(col, vec3(0.4545));
                 
                 fragColor = vec4(col, 1.0);
             }
+            
             // --- USER CODE END ---
 
             void main() {
@@ -153,7 +163,7 @@
             }
         `;
 
-        // --- 3. WebGL Boilerplate ---
+        // --- 3. WebGL Boilerplate (Τα τεχνικά για να τρέξει) ---
         function createShader(gl, type, source) {
             const shader = gl.createShader(type);
             gl.shaderSource(shader, source);
@@ -170,7 +180,7 @@
         const fragmentShader = createShader(gl, gl.FRAGMENT_SHADER, fsSource);
         
         if (!vertexShader || !fragmentShader) {
-            document.body.innerHTML = "<h1 style='color:white'>Error compiling shaders.</h1>";
+            document.body.innerHTML = "<h1 style='color:white;text-align:center;margin-top:20%'>Error compiling shaders.<br>Check console (F12) for details.</h1>";
         }
 
         const program = gl.createProgram();
@@ -191,6 +201,7 @@
 
         function render(time) {
             time *= 0.001; 
+            
             const displayWidth  = canvas.clientWidth;
             const displayHeight = canvas.clientHeight;
             if (canvas.width  !== displayWidth || canvas.height !== displayHeight) {
@@ -198,12 +209,15 @@
                 canvas.height = displayHeight;
                 gl.viewport(0, 0, gl.canvas.width, gl.canvas.height);
             }
+
             gl.useProgram(program);
             gl.enableVertexAttribArray(positionLocation);
             gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
             gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+
             gl.uniform3f(resolutionLocation, canvas.width, canvas.height, 1.0);
             gl.uniform1f(timeLocation, time);
+
             gl.drawArrays(gl.TRIANGLES, 0, 6);
             requestAnimationFrame(render);
         }
