@@ -3,6 +3,7 @@
 A real-time WebGL black hole simulation running entirely in the browser — no libraries, no frameworks, just raw GLSL shaders.
 
 
+![B-H-S](https://github.com/user-attachments/assets/2d6d61f6-e08e-4fc7-9807-2a513ac9b0e3)
 
 ---
 
