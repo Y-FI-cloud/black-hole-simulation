@@ -2,7 +2,7 @@
 
 A real-time WebGL black hole simulation running entirely in the browser — no libraries, no frameworks, just raw GLSL shaders.
 
-![Black Hole Simulation](demo.gif)
+
 
 ---
 
@@ -26,7 +26,7 @@ cd YOUR_REPO
 open index.html   # macOS
 # or just double-click index.html on Windows/Linux
 ```
-
+Link :  https://y-fi-cloud.github.io/black-hole-simulation/
 ---
 
 ## 🛠️ How It Works
@@ -58,19 +58,3 @@ Inside `index.html`, in the fragment shader:
 | `iTime * 2.0` | — | Disk rotation speed |
 
 ---
-
-## 📸 Capturing the GIF
-
-To create `demo.gif` for this README:
-
-1. Open `index.html` in Chrome
-2. Use **[ScreenToGif](https://www.screentogif.com/)** (Windows) or **[Kap](https://getkap.co/)** (macOS)
-3. Record 3–5 seconds of the simulation
-4. Export as `demo.gif` and place it in the repo root
-5. The README will pick it up automatically ✅
-
----
-
-## 📄 License
-
-MIT — do whatever you want with it.
